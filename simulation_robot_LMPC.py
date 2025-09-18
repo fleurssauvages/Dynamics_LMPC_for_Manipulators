@@ -64,13 +64,13 @@ while True:
     Uopt, Xopt, poses = lmpc_solver.solve(T_current, T_des, xdot)
 
     #Solve QP
-    tau_reg = 5 * (panda.qr - panda.q) - 0.5 * panda.qd # PD to rest position
+    tau_reg = 5 * (panda.qr - panda.q) - 0.5 * panda.qd # PD to rest position, careful tunning
     qp_solver.update_robot_state(panda)
     qp_solver.solve(Uopt[0:6], w_tau_reg=1.0, tau_reg=tau_reg, f_ext=None)
     tau = qp_solver.solution
     if tau is None:
         tau = panda.rne(panda.q, panda.qd, panda.qdd)
-        print("QP failed using gravity compensation")
+        print("QP failed, using gravity compensation")
     
     #Simulate
     panda.qdd = panda.accel(panda.q, panda.qd, tau)
