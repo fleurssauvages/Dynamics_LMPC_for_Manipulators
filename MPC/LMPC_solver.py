@@ -18,7 +18,7 @@ class LinearMPCController:
         self.u_min = u_min
         self.u_max = u_max
         self.H = np.zeros((self.n*self.horizon, self.n*self.horizon)) # Hessian
-        self.g = np.zeros((self.n*self.horizon, self.n*self.horizon)) # Gradient
+        self.g = np.zeros((0, self.n*self.horizon)) # Gradient
         self.A = np.zeros((0, self.n*self.horizon))  # Inequality onstraints
         self.b = np.zeros(0)  # Inequality constraint bounds
         self.eqA = np.zeros((0, self.n*self.horizon))  # Equality constraints
@@ -63,12 +63,18 @@ class LinearMPCController:
         # Initial state X0 = [xi_current, xi_dot_current]        
         Xd = np.tile(xi_des, self.horizon)
         Xprev = np.tile(xi_current, self.horizon)
+        
+        Q_pose = np.eye(6)       # weight for pose error
+        Q_vel  = np.eye(6) * 0.001 # low weight for velocity error
+        Q = block_diag(Q_pose, Q_vel)  # 12x12
+        Q_big = block_diag(*[Q for _ in range(self.horizon-1)])  # (12h x 12h)
+        Q_big = block_diag(Q_big, np.eye(6) * 150, np.eye(6) * 150)  # Final state also considered, strong weight on final pose and velocity
 
         # Cost: (A_big x0 + B_big U - Xd)^T (A_big x0 + B_big U - Xd) + gamma * U^T U
         # Variable is stacked X_pred(= A_big @ np.tile(x0, h) + B_big @ U) and U
         # Formulation according to QP, see QP for more details
-        self.H = 2 * (B_big.T @ B_big + self.gamma * np.eye(self.n*self.horizon))
-        self.g = 2 * (B_big.T @ (A_big @ Xprev - Xd))
+        self.H = 2 * (B_big.T @ Q_big @ B_big + self.gamma * np.eye(self.n*self.horizon))
+        self.g = 2 * (B_big.T @ Q_big @ (A_big @ Xprev - Xd))
         
         # Constraints on U
         if self.u_min is not None:
@@ -87,8 +93,8 @@ class LinearMPCController:
         T = ini_pose
         poses = [T]
         for i in range(self.horizon):
-            u_i = Uopt[self.n*i:self.n*(i+1)]
-            T = T @ se3_exp(dlog @ u_i * self.dt)
+            xi_pred = Xopt[i, :6]
+            T = T @ se3_exp(xi_pred)
             poses.append(T)
         return Uopt, Xopt, poses
 

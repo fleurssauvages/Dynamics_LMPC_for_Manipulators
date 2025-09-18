@@ -11,27 +11,19 @@ from scipy.spatial.transform import Rotation as R
 from scipy.signal import square
 
 # Init env
-env = swift.Swift()
 panda = rtb.models.DH.Panda()
 panda.q = panda.qr
 panda.taulim = [87, 87, 87, 87, 12, 12, 12]
-panda.qdlim = np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100]) * 100
-
-pandaShow = rtb.models.Panda()
-pandaShow.q = panda.q
-env.launch(realtime=True)
-env.add(pandaShow)
-dt = 0.05
+panda.qdlim = np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100])
+dt = 0.01
 
 # Init desired position
 T_ini = panda.fkine(panda.q)
 T_des = panda.fkine(panda.q)
 target = sg.Sphere(radius=0.02, pose=T_des, color=[0,1,0])
-env.add(target)
-env.set_camera_pose([1.0, 1.0, 0.7], [0, 0, 0.4])
 
 # Init LMPC solver for path planning, gamma the gain of the controller as it ensures slows commands u, the lower the faster
-lmpc_solver = LinearMPCController(horizon=25, dt=dt, gamma = 0.00001,
+lmpc_solver = LinearMPCController(horizon=25, dt=dt, gamma = 0.08,
                                     u_min=np.array([-2.0, -2.0, -2.0, -10.0, -10.0, -10.0]),
                                     u_max=np.array([ 2.0, 2.0, 2.0, 10.0, 10.0, 10.0]))
 
@@ -45,11 +37,12 @@ t_target_x, t_target_y, t_target_z = [], [], []
 times = []
 
 # Loop
-while env.sim_time < 15:
+sim_time = 0
+while sim_time < 15:
     #Compute desired velocity from simple prop controller
     T_current = panda.fkine(panda.q)
-    T_des.t[0] = T_ini.t[0] + 0.2 * np.sin(env.sim_time * 0.5)
-    T_des.t[0] = T_ini.t[0] + square(env.sim_time * 0.5) * 0.2
+    # T_des.t[0] = T_ini.t[0] + 0.2 * np.sin(sim_time * np.pi * 2 / 10) * 0.2
+    T_des.t[0] = T_ini.t[0] + square(sim_time * np.pi * 2 / 10) * 0.4
     xdot = panda.jacobe(panda.q) @ panda.qd
     Uopt, Xopt, poses = lmpc_solver.solve(T_current, T_des, xdot)
     target.T = T_des
@@ -71,7 +64,7 @@ while env.sim_time < 15:
     t_x.append(t[0])
     t_y.append(t[1])
     t_z.append(t[2])
-    times.append(env.sim_time)
+    times.append(sim_time)
     
     R_rel_target = T_ini.R @ T_des.R
     theta_target = R.from_matrix(R_rel_target).as_rotvec()[0]
@@ -85,10 +78,9 @@ while env.sim_time < 15:
     panda.qdd = panda.accel(panda.q, panda.qd, tau)
     panda.qd += panda.qdd * dt
     panda.q += panda.qd * dt
-    pandaShow.q = panda.q
-    env.step(dt)
+    sim_time += dt
+    print("Time:", np.round(sim_time, 3), "s")
     
-env.close()
 # Set up dynamic plot
 fig, ax = plt.subplots(figsize=(8,6))
 ax.set_xlabel("Time")

@@ -19,7 +19,7 @@ pandaShow = rtb.models.Panda()
 pandaShow.q = panda.q
 env.launch(realtime=True)
 env.add(pandaShow)
-dt = 0.05
+dt = 0.05 # Ideally, should be less than 0.01, but QP solving is too slow on my computer, 0.05 is realtime but unstable when close to singularities
 
 # Init desired position
 T_ini = panda.fkine(panda.q)
@@ -29,7 +29,7 @@ env.add(target)
 env.set_camera_pose([1.0, 1.0, 0.7], [0, 0, 0.4])
 
 # Init LMPC solver for path planning, gamma the gain of the controller as it ensures slows commands u, the lower the faster
-lmpc_solver = LinearMPCController(horizon=10, dt=dt, gamma = 0.001,
+lmpc_solver = LinearMPCController(horizon=25, dt=dt, gamma = 0.08,
                                     u_min=np.array([-2.0, -2.0, -2.0, -10.0, -10.0, -10.0]),
                                     u_max=np.array([ 2.0, 2.0, 2.0, 10.0, 10.0, 10.0]))
 
@@ -59,19 +59,15 @@ init_tau = panda.rne(panda.q, panda.qd, panda.qdd)
 qp_solver.solution = init_tau
 xdot = np.zeros(6)
 while True:
-    t = time.time()
     #Compute desired velocity from simple prop controller
     T_current = panda.fkine(panda.q)
     xdot = panda.jacobe(panda.q) @ panda.qd
     Uopt, Xopt, poses = lmpc_solver.solve(T_current, T_des, xdot)
-    print("time LMPC:", time.time() - t)
     
     #Solve QP
-    t = time.time()
     tau_reg = 5 * (panda.qr - panda.q) - 0.5 * panda.qd # PD to rest position, careful tunning
     qp_solver.update_robot_state(panda)
     qp_solver.solve(Uopt[0:6], w_tau_reg=1.0, tau_reg=tau_reg, f_ext=None)
-    print("time QP:", time.time() - t)
     tau = qp_solver.solution
     if tau is None:
         tau = panda.rne(panda.q, panda.qd, panda.qdd)

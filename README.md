@@ -43,6 +43,27 @@ pip install roboticstoolbox-python numpy qpsolvers
 └── LICENSE                         # License file
 ```
 
+## 🎥 Demos
+
+<div align="center">
+
+### 🔹Plot with X sin desired target trajectory
+<img src="images/sin.png" width="600" alt="Plot sin trajectory with LMPC">
+
+---
+
+### 🔹Plot with X square desired target trajectory
+<img src="images/square.png" width="600" alt="Plot square trajectory with LMPC">
+
+---
+
+### 🔹Plot with X square desired target trajectory, out of reach
+<img src="images/square_position_out_of_reach.png" width="600" alt="Plot square trajectory with LMPC">
+
+
+</div>
+
+---
 ## 📜 License
 This project is licensed under the [MIT License](LICENSE).  
 
