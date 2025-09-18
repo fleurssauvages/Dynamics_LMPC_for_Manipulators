@@ -24,7 +24,7 @@ The robotics toolbox experiences some bugs when using URDF and Dynamics. The DH 
 Clone the repository and install the required dependencies:
 
 ```bash
-pip install roboticstoolbox-python numpy
+pip install roboticstoolbox-python numpy qpsolvers
 ```
 
 ---

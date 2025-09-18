@@ -8,7 +8,7 @@ class QPController:
         self.robot = robot
         self.joint_positions = robot.q
         self.joint_velocities = robot.qd
-        self.joints_limits = robot.qlim - 0.5
+        self.joints_limits = robot.qlim + np.array([0.5, -0.5]) @ np.ones((2, robot.n))
         self.joints_velocities_limits = robot.qdlim
         self.joints_tau_limits = robot.taulim
         self.H = np.eye(robot.n)  # Hessian
@@ -22,7 +22,7 @@ class QPController:
         self.dt = dt # Time step of the controller loop / simulation
         self.solution = None
 
-    def solve(self, xdotdot, w_tau_reg=0.01, tau_reg=None, f_ext=None):
+    def solve(self, xdotdot, w_tau_reg=0.01, tau_reg=None, f_ext=None, W = np.diag([1.0, 1.0, 2.0, 0.1, 0.1, 0.1])):
         """
         Solve the quadratic programming problem using previous solution as initial value
         Minimize the cost function ||J qdot - xdot||^2 + alpha ||N qdot||^2 - beta * manipulability_gradient * qdot
@@ -33,7 +33,7 @@ class QPController:
         The weight matrix W can be used to prioritize translation over rotation or vice-versa,
         if translations are prioritize, set higher values on the first 3 diagonal elements
         """
-        self.update_IK_problem(self.joint_positions, self.joint_velocities, xdotdot, w_tau_reg=w_tau_reg, tau_reg=tau_reg, f_ext=f_ext)
+        self.update_IK_problem(self.joint_positions, self.joint_velocities, xdotdot, w_tau_reg=w_tau_reg, tau_reg=tau_reg, f_ext=f_ext, W = W)
         self.update_joints_limits(self.joint_positions, self.joint_velocities, f_ext=None)
         x = solve_qp(sp.csc_matrix(self.H), self.g, G=sp.csc_matrix(self.A), h=self.b, A=sp.csc_matrix(self.eqA), b=self.eqb, lb=self.lb, ub=self.ub, solver="osqp", initvals=self.solution)
         self.solution = x
@@ -46,7 +46,7 @@ class QPController:
         self.joint_velocities = robot.qd
         pass
             
-    def update_IK_problem(self, q, qdot, xdotdot, w_tau_reg=0.01, tau_reg=None, f_ext=None):
+    def update_IK_problem(self, q, qdot, xdotdot, w_tau_reg=0.01, tau_reg=None, f_ext=None, W = np.diag([1.0, 1.0, 2.0, 0.1, 0.1, 0.1])):
         """
         Update the IK problem parameters based on desired end-effector velocity (6D vector) and current joint positions
         xdotdot: np.array of shape (6,)
@@ -69,8 +69,8 @@ class QPController:
         b = A @ (-C -G + J.T @ f_ext) + Jdot @ qdot
         # QP: variable τ (n,)
         # cost = ||A τ + b - a_des||^2 
-        H_task = 2 * A.T @ A           # n x n
-        g_task = 2 * A.T @ (b - xdotdot) # n
+        H_task = 2 * A.T @ W @ A           # n x n
+        g_task = 2 * A.T @ W @ (b - xdotdot) # n
 
         # Regularization around tau_reg (if None use zeros), the cost also minimizes: w_reg ||τ - τ_reg||^2 projected on the null space
         if tau_reg is None:
