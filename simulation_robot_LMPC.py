@@ -6,7 +6,6 @@ import numpy as np
 from MPC.QP_solver import QPController
 import spatialgeometry as sg
 from MPC.LMPC_solver import LinearMPCController
-import time
 
 # Init env
 env = swift.Swift()
@@ -19,7 +18,7 @@ pandaShow = rtb.models.Panda()
 pandaShow.q = panda.q
 env.launch(realtime=True)
 env.add(pandaShow)
-dt = 0.05 # Ideally, should be less than 0.01, but QP solving is too slow on my computer, 0.05 is realtime but unstable when close to singularities
+dt = 0.01 # Ideally, should be less than 0.01, but QP solving is too slow on my computer, 0.05 is realtime but unstable
 
 # Init desired position
 T_ini = panda.fkine(panda.q)
@@ -63,7 +62,8 @@ while True:
     T_current = panda.fkine(panda.q)
     xdot = panda.jacobe(panda.q) @ panda.qd
     Uopt, Xopt, poses = lmpc_solver.solve(T_current, T_des, xdot)
-    
+    target.T = T_des
+
     #Solve QP
     tau_reg = 5 * (panda.qr - panda.q) - 0.5 * panda.qd # PD to rest position, careful tunning
     qp_solver.update_robot_state(panda)
